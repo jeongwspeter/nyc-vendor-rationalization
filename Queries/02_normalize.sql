@@ -50,8 +50,12 @@ SELECT * FROM payments_scoped LIMIT 20;
 -- one vendor and understates another, and neither error is visible downstream.
 -- Every rule below corresponds to a variant pattern observed in 01 block 8.
 --
--- The suffix list covers legal boilerplate and common organizational suffixes
--- so that name variants of the same supplier collapse to one canonical string.
+-- The suffix list is pure legal boilerplate. FUND, FOUNDATION, GROUP, SERVICES,
+-- ASSOC and ASSOCIATES were in an earlier version and were removed: those words
+-- carry identity, and stripping them merged legally distinct entities — a
+-- Chamber of Commerce with its charitable Foundation, an LLC with an unrelated
+-- nonprofit. That correction reduced merges from 77 to 74 and made each
+-- remaining merge defensible one by one. Fewer merges, all of them right.
 --
 -- Applied to a sample first so the transformation can be inspected against the
 -- raw value before it is written to a table.
@@ -76,7 +80,7 @@ SELECT DISTINCT payee_name AS raw_name,
             ';', '')
           , '\\s+', ' ')),
         '^THE ', ''),
-      ' (LLC|LLP|INC|CORP|CORPORATION|INCORPORATED|LTD|LIMITED|LP|CO|COMPANY|PC|PLLC|FUND|FOUNDATION|GROUP|SERVICES|ASSOC|ASSOCIATES|DBA)$',
+      ' (LLC|LLP|INC|CORP|CORPORATION|INCORPORATED|LTD|LIMITED|LP|CO|COMPANY|PC|PLLC)$',
       '')
     ) AS vendor_norm
 FROM payments_scoped
@@ -113,7 +117,7 @@ SELECT
             '(', ''), ')', ''), '''', ''), '#', ''), ';', '')
           , '\\s+', ' ')),
         '^THE ', ''),
-      ' (LLC|LLP|INC|CORP|CORPORATION|INCORPORATED|LTD|LIMITED|LP|CO|COMPANY|PC|PLLC|FUND|FOUNDATION|GROUP|SERVICES|ASSOC|ASSOCIATES|DBA)$',
+      ' (LLC|LLP|INC|CORP|CORPORATION|INCORPORATED|LTD|LIMITED|LP|CO|COMPANY|PC|PLLC)$',
       '')
     ) AS vendor_norm
 FROM payments_scoped;
