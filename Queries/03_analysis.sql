@@ -10,6 +10,11 @@
 -- The discount rate is an assumption, not a result. Published benchmarks for
 -- tail-spend consolidation run 5-15%; all three are reported and the 10%
 -- midpoint is used for the headline.
+--
+-- Blocks 4 and 8 produce two different savings figures and both are reported.
+-- Block 4 is a ceiling that assumes all tail spend is consolidatable. Block 8
+-- restricts to a rule-defined basket of categories and is the defensible
+-- number. See block 8 for why the difference is roughly fourfold.
 
 USE vendor_rationalization;
 
@@ -99,8 +104,10 @@ GROUP BY vendor_segment
 ORDER BY segment_spend DESC;
 
 
--- 4. Savings KPI. Addressable spend is all tail spend; savings are reported
--- at the 5/10/15% benchmark range with 10% as the headline.
+-- 4. Savings ceiling. Addressable spend is taken as all tail spend, which
+-- assumes every tail dollar can be consolidated. That assumption does not
+-- survive inspection of what the tail contains — see block 8. Retained and
+-- reported so the difference between the two figures is visible.
 -- Output: Results/03_04_savings_kpi.csv
 WITH vendor_spend AS (
     SELECT vendor_norm, SUM(check_amount) AS vendor_total
@@ -157,6 +164,56 @@ HAVING vendor_count >= 10            -- below this a category cannot be fragment
 ORDER BY category_spend DESC
 LIMIT 25;
 
+-- 5b. Same scan across all categories with the basket rule applied, so the
+-- included and excluded sets can be compared side by side rather than only the
+-- included set being visible.
+WITH cat_vendor AS (
+    SELECT
+        expense_category,
+        vendor_norm,
+        SUM(check_amount) AS vendor_total
+    FROM payments_normalized
+    WHERE expense_category IS NOT NULL AND TRIM(expense_category) <> ''
+    GROUP BY expense_category, vendor_norm
+)
+SELECT
+    expense_category,
+    CASE WHEN expense_category IN (
+        'CONTRACTUAL SERVICES GENERAL',
+        'SUPPLIES + MATERIALS - GENERAL',
+        'PROF SERV OTHER',
+        'EQUIPMENT GENERAL',
+        'DATA PROCESSING EQUIPMENT MAINTENANCE',
+        'DATA PROCESSING SUPPLIES',
+        'FOOD & FORAGE SUPPLIES',
+        'AUTOMOTIVE SUPPLIES & MATERIAL',
+        'MAINTENANCE SUPPLIES',
+        'OFFICE EQUIPMENT MAINTENANCE',
+        'OFFICE EQUIPMENT',
+        'PRINTING SUPPLIES',
+        'TELECOMMUNICATIONS EQUIPMENT',
+        'SECURITY EQUIPMENT',
+        'CLEANING SUPPLIES',
+        'MOTOR VEHICLE EQUIPMENT',
+        'FOOD SERVICE EQUIPMENT',
+        'INSTRUCTIONAL SUPPLIES',
+        'MAINTENANCE SUPPLIES--WTC ONLY',
+        -- added after full-category scan (2026-07-13):
+        'SECURITY SERVICES',
+        'MAINT & REP GENERAL',
+        'PROF SERV COMPUTER SERVICES',
+        'MOTOR VEHICLE FUEL'
+    ) THEN 'Target'
+      ELSE 'Excluded'
+    END AS basket_status,
+    COUNT(*)                                              AS vendor_count,
+    ROUND(SUM(vendor_total), 2)                           AS category_spend,
+    ROUND(MAX(vendor_total), 2)                           AS top_vendor_spend,
+    ROUND(100 * MAX(vendor_total) / SUM(vendor_total), 2) AS top_vendor_share_pct
+FROM cat_vendor
+GROUP BY expense_category
+ORDER BY category_spend DESC;
+
 -- 6. Vendors whose spend was split across multiple raw payee names. Quantifies
 -- what the normalization work in 02 recovered: these suppliers appeared smaller
 -- than they are, and several move materially up the ranking once merged.
@@ -184,3 +241,97 @@ FROM payments_normalized
 GROUP BY vendor_norm
 ORDER BY total_spend DESC
 LIMIT 20;
+
+
+-- 8. Savings restricted to a rule-defined basket.
+--
+-- The ceiling in block 4 treats all tail spend as addressable. Inspection of
+-- the tail shows it also contains rents, legal settlements, one-off payments
+-- and human-services contracts, none of which respond to bulk negotiation.
+-- Applying the discount rate to that spend overstates the opportunity by
+-- roughly a factor of four.
+--
+-- This block recomputes on tail spend within categories that meet a stated
+-- rule: buyer-chosen goods and general services, no mandated or court-driven
+-- payments. Every category matching the rule is included, including small ones,
+-- so the basket is defined by the rule rather than selected to reach a number.
+-- Output: Results/03_08_realistic_kpi.csv
+
+-- 8a. Category strings verified before use. IN is exact-match, and an earlier
+-- pass silently dropped the State of New York Medicaid rows on a near-miss
+-- string, so the names below are confirmed against the data rather than
+-- assumed.
+SELECT expense_category, COUNT(*) AS payments,
+       ROUND(SUM(check_amount), 2) AS dollars
+FROM payments_normalized
+WHERE expense_category LIKE '%CONTRACTUAL SERVICES%'
+   OR expense_category LIKE '%SUPPLIES%'
+   OR expense_category LIKE '%PROF SERV OTHER%'
+   OR expense_category LIKE '%EQUIPMENT%'
+GROUP BY expense_category
+ORDER BY dollars DESC;
+
+-- 8b. Same Pareto CTEs as block 4, but filtering at payment level rather than
+-- vendor level: a row counts only if it is paid to a tail vendor and falls in a
+-- target category. Filtering at vendor level would have counted a tail vendor's
+-- non-consolidatable spend as addressable.
+WITH vendor_spend AS (
+    SELECT vendor_norm, SUM(check_amount) AS vendor_total
+    FROM payments_normalized
+    GROUP BY vendor_norm
+),
+ranked AS (
+    SELECT
+        vendor_norm,
+        SUM(vendor_total) OVER (ORDER BY vendor_total DESC)
+            / SUM(vendor_total) OVER () AS cumulative_share
+    FROM vendor_spend
+),
+tail_vendors AS (
+    SELECT vendor_norm
+    FROM ranked
+    WHERE cumulative_share > 0.80
+),
+target_tail AS (
+    SELECT p.check_amount
+    FROM payments_normalized p
+    JOIN tail_vendors t ON p.vendor_norm = t.vendor_norm
+    WHERE p.expense_category IN (
+        'CONTRACTUAL SERVICES GENERAL',
+        'SUPPLIES + MATERIALS - GENERAL',
+        'PROF SERV OTHER',
+        'EQUIPMENT GENERAL',
+        'DATA PROCESSING EQUIPMENT MAINTENANCE',
+        'DATA PROCESSING SUPPLIES',
+        'FOOD & FORAGE SUPPLIES',
+        'AUTOMOTIVE SUPPLIES & MATERIAL',
+        'MAINTENANCE SUPPLIES',
+        'OFFICE EQUIPMENT MAINTENANCE',
+        'OFFICE EQUIPMENT',
+        'PRINTING SUPPLIES',
+        'TELECOMMUNICATIONS EQUIPMENT',
+        'SECURITY EQUIPMENT',
+        'CLEANING SUPPLIES',
+        'MOTOR VEHICLE EQUIPMENT',
+        'FOOD SERVICE EQUIPMENT',
+        'INSTRUCTIONAL SUPPLIES',
+        'MAINTENANCE SUPPLIES--WTC ONLY',
+        -- added after full-category scan (2026-07-13):
+        'SECURITY SERVICES',
+        'MAINT & REP GENERAL',
+        'PROF SERV COMPUTER SERVICES',
+        'MOTOR VEHICLE FUEL'
+        -- Considered and excluded, conservatively:
+        --   PROF SERV LEGAL SERVICES     court-driven and specialized
+        --   TELEPHONE & OTHER COMMUNICATNS  utility-like, few suppliers
+        --   PROF SERV CURRIC & PROF DEVEL   borderline; excluded rather than
+        --                                   argued for
+        --   OTHR SERV AND CHRGS-GENERAL     unclassifiable residual category
+    )
+)
+SELECT
+    ROUND(SUM(check_amount), 2)          AS realistic_addressable_spend,
+    ROUND(SUM(check_amount) * 0.05, 2)   AS savings_at_5pct,
+    ROUND(SUM(check_amount) * 0.10, 2)   AS savings_at_10pct_REALISTIC,
+    ROUND(SUM(check_amount) * 0.15, 2)   AS savings_at_15pct
+FROM target_tail;
