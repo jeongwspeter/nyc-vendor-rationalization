@@ -1,6 +1,6 @@
 # NYC Vendor Rationalization: Tail-Spend Consolidation Analysis
 
-New York City could realistically save about **$149M a year** by consolidating its small suppliers in the categories where consolidation actually works. Depending on the savings rate, the range is $75M–$224M. If every dollar of tail spend could be consolidated, the ceiling would be about $620M, but most of it can't, so I report both numbers and use the smaller one as the headline.
+New York City could realistically save about **$149M a year** by consolidating its small suppliers in the categories where consolidation actually works. Depending on the savings rate, the range is $75M-$224M. If every dollar of tail spend could be consolidated, the ceiling would be about $620M, but most of it can't, so I report both numbers and use the smaller one as the headline.
 
 797 vendors (4.3%) account for 80% of the city's $31.0B in addressable spend, and the other 17,626 vendors share the remaining $6.2B. That long tail includes rents, legal settlements and human-services contracts that no volume deal can touch. So the headline only counts tail spend in 23 categories that can realistically be consolidated, which comes to $1.49B.
 
@@ -24,7 +24,7 @@ Gross spend is $49.40B and the analysis uses $31.00B. Every removal is listed in
 
 | Stage | Rows | Spend | Removed |
 |---|---|---|---|
-| Raw extract | 1,560,597 | $49.40B | – |
+| Raw extract | 1,560,597 | $49.40B | - |
 | After scoping (pensions, negatives, placeholder values) | 1,554,107 | $39.43B | 6,490 rows / $9.97B |
 | After removing payments to other governments | 1,552,117 | $31.00B | 1,990 rows / $8.43B |
 | **Analysis table** (`payments_normalized`) | **1,552,117** | **$31.00B** | 18,423 distinct vendors |
@@ -62,7 +62,7 @@ The query results are exported to `Exports/` as CSVs, and those are what the Tab
 
 **Cleaning vendor names**
 - The steps: uppercase, remove punctuation, collapse extra spaces, drop a leading "THE", and drop one trailing legal suffix (INC, LLC, CORP and so on).
-- That merged 74 duplicate names (18,502 → 18,428 vendors), and some of them carried real money. School Specialty ($26.9M), Wilson Language ($14.7M) and Imagine Learning ($11.9M) were each split across two spellings.
+- That merged 74 duplicate names (from 18,502 to 18,428 vendors), and some of them carried real money. School Specialty ($26.9M), Wilson Language ($14.7M) and Imagine Learning ($11.9M) were each split across two spellings.
 - My first suffix list also removed words like FOUNDATION, GROUP, SERVICES and ASSOC. That wrongly merged separate organizations, for example a Chamber of Commerce with its charitable foundation. Taking those words out of the list dropped the merges from 77 to 74, and I could check each remaining one by hand.
 - I didn't use fuzzy matching. In spend data, a wrong merge makes one vendor look bigger and another look smaller, and nothing later in the analysis would catch it. NYC's vendor names were clean enough that simple rules were enough.
 
@@ -90,10 +90,10 @@ The query results are exported to `Exports/` as CSVs, and those are what the Tab
 
 These categories have many vendors, no dominant supplier, and goods or services the city chooses to buy:
 
-1. **Contractual Services – General:** $1.30B across 1,985 vendors; the largest supplier has only 6.0%
-2. **Supplies + Materials – General:** $1.04B across 3,853 vendors; the largest supplier has 11.8%
-3. **Prof Serv – Other:** $730M across 1,326 vendors, although the largest supplier already has 26.7%
-4. **Equipment – General:** the same pattern on a smaller scale
+1. **Contractual Services - General:** $1.30B across 1,985 vendors; the largest supplier has only 6.0%
+2. **Supplies + Materials - General:** $1.04B across 3,853 vendors; the largest supplier has 11.8%
+3. **Prof Serv - Other:** $730M across 1,326 vendors, although the largest supplier already has 26.7%
+4. **Equipment - General:** the same pattern on a smaller scale
 
 Some fragmented categories don't make sense to consolidate: Charter Schools ($3.4B of required per-pupil payments), Payments to Delegate Agencies, and homeless-services categories, which are networks of social-service providers rather than purchases you can bundle. Maintenance & Operation of Infrastructure is already 57% with one supplier.
 

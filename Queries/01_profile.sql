@@ -4,7 +4,6 @@
 -- Purpose is to establish what the extract actually contains and to find the
 -- artifacts that scoping in 02_normalize.sql has to handle: placeholder
 -- amounts, negative values, non-procurement agencies, and payee-name variants.
--- Output: Results/01_profile_results.csv
 
 USE vendor_rationalization;
 

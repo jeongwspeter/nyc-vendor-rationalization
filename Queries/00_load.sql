@@ -11,7 +11,7 @@ USE vendor_rationalization;
 -- during development and TRUNCATE would have left stale columns in place.
 DROP TABLE IF EXISTS payments_raw;
 
--- check_amount is DECIMAL, not FLOAT — this table has to reconcile to the
+-- check_amount is DECIMAL, not FLOAT, because this table has to reconcile to the
 -- published source totals to the cent, and float drift over 1.5M rows would
 -- make that impossible. Text widths are generous; the export documents no
 -- maximum length for the payee and vendor fields.

@@ -6,7 +6,7 @@
 
 USE vendor_rationalization;
 
--- STAGE 1 — Scoping
+-- STAGE 1: Scoping
 --
 -- Three exclusions, all identified in profiling:
 --   check_amount <= 0        refunds and reversals; not outbound spend
@@ -15,8 +15,8 @@ USE vendor_rationalization;
 --   agency = 'Pension Contributions'
 --                            employee benefit transfers, not vendor procurement
 --
--- These are exclusions of scope, not of inconvenience: each removes a category
--- of row that no procurement decision could act on. Dollar and row impact is
+-- Each of these removes a kind of row that no procurement decision could act
+-- on. Dollar and row impact is
 -- recorded below so the exclusions can be audited against the published totals.
 
 DROP TABLE IF EXISTS payments_scoped;
@@ -38,7 +38,7 @@ FROM payments_scoped;
 
 SELECT * FROM payments_scoped LIMIT 20;
 
--- STAGE 2 — Normalization rules, validated before application
+-- STAGE 2: Normalization rules, tested on a sample first
 --
 -- The chain uppercases, strips punctuation that varies between filings
 -- (periods, commas, apostrophes, parentheses, hash, semicolon), converts
@@ -52,10 +52,10 @@ SELECT * FROM payments_scoped LIMIT 20;
 --
 -- The suffix list is pure legal boilerplate. FUND, FOUNDATION, GROUP, SERVICES,
 -- ASSOC and ASSOCIATES were in an earlier version and were removed: those words
--- carry identity, and stripping them merged legally distinct entities — a
+-- carry identity, and stripping them merged legally distinct entities (a
 -- Chamber of Commerce with its charitable Foundation, an LLC with an unrelated
--- nonprofit. That correction reduced merges from 77 to 74 and made each
--- remaining merge defensible one by one. Fewer merges, all of them right.
+-- nonprofit). Removing them cut merges from 77 to 74, and I checked each
+-- remaining merge by hand.
 --
 -- Applied to a sample first so the transformation can be inspected against the
 -- raw value before it is written to a table.
@@ -132,9 +132,8 @@ SELECT
     (SELECT COUNT(DISTINCT vendor_norm) FROM payments_normalized) AS names_collapsed
 ;
 
--- Every merge the rules produced, listed with its source spellings. Reviewed
--- by hand: a normalization that cannot be shown to be correct case by case is
--- not defensible, and this is the artifact that shows it.
+-- Every merge the rules produced, listed with its source spellings. I went
+-- through this list by hand to confirm each merge was correct.
 
 SELECT
     vendor_norm,
@@ -158,8 +157,8 @@ FROM payments_normalized;
 --
 -- These five surfaced in the top-vendor ranking after normalization, not in
 -- profiling, because they are payees rather than a distinguishable agency or
--- category. They are payments between public bodies — the largest is the State
--- of New York Medicaid obligation — and no consolidation decision applies to
+-- category. They are payments between public bodies (the largest is the State
+-- of New York Medicaid obligation), and no consolidation decision applies to
 -- them. Removed here rather than in the stage 1 predicate because they were
 -- identified from normalized output that did not exist at that point.
 

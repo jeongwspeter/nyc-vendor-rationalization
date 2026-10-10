@@ -3,7 +3,7 @@
 --
 -- Method: vendors are ranked by total spend and assigned a running cumulative
 -- share. Vendors inside the top 80% of spend are treated as strategic; the
--- remainder is tail spend — many suppliers, small individual volumes, no
+-- remainder is tail spend: many suppliers, small individual volumes, no
 -- negotiating leverage. Savings are tail spend multiplied by a consolidation
 -- discount rate.
 --
@@ -13,14 +13,14 @@
 --
 -- Blocks 4 and 8 produce two different savings figures and both are reported.
 -- Block 4 is a ceiling that assumes all tail spend is consolidatable. Block 8
--- restricts to a rule-defined basket of categories and is the defensible
+-- restricts to a rule-defined basket of categories and is the realistic
 -- number. See block 8 for why the difference is roughly fourfold.
 
 USE vendor_rationalization;
 
 
 -- 1. Scope counters for the analysis population.
--- Output: Results/03_01_headline.csv
+-- Output: Exports/1_headline-counter.csv
 SELECT
     ROUND(SUM(check_amount), 2)        AS total_spend,
     COUNT(DISTINCT vendor_norm)        AS distinct_vendors,
@@ -33,7 +33,7 @@ FROM payments_normalized;
 
 -- 2. Vendor ranking with cumulative spend share. Source table for the Pareto
 -- chart and for the strategic/tail split used in every block below.
--- Output: Results/03_02_vendor_pareto.csv
+-- Output: Exports/2_vendor-pareto.csv
 WITH vendor_spend AS (
     SELECT
         vendor_norm,
@@ -68,9 +68,9 @@ ORDER BY spend_rank;
 
 
 -- 3. Strategic and tail segments collapsed to two rows, with each segment's
--- share of spend and of vendor count. The asymmetry between those two
--- percentages is the finding.
--- Output: Results/03_03_segment_summary.csv
+-- share of spend and of vendor count. The gap between those two
+-- percentages is the main finding.
+-- Output: Exports/3_strategic-vs-tail-summary.csv
 WITH vendor_spend AS (
     SELECT vendor_norm, SUM(check_amount) AS vendor_total
     FROM payments_normalized
@@ -105,10 +105,10 @@ ORDER BY segment_spend DESC;
 
 
 -- 4. Savings ceiling. Addressable spend is taken as all tail spend, which
--- assumes every tail dollar can be consolidated. That assumption does not
--- survive inspection of what the tail contains — see block 8. Retained and
--- reported so the difference between the two figures is visible.
--- Output: Results/03_04_savings_kpi.csv
+-- assumes every tail dollar can be consolidated. That isn't true once you
+-- look at what the tail contains (see block 8). Kept so the two figures can be
+-- compared.
+-- Output: Exports/4_kpi.csv
 WITH vendor_spend AS (
     SELECT vendor_norm, SUM(check_amount) AS vendor_total
     FROM payments_normalized
@@ -134,15 +134,15 @@ SELECT
 FROM tail;
 
 
--- 5. Category fragmentation, to identify where consolidation is feasible
--- rather than merely large. top_vendor_share_pct is the share held by the
+-- 5. Category fragmentation, to find categories where consolidation is
+-- practical. top_vendor_share_pct is the share held by the
 -- single largest supplier in each category: a low share means no incumbent
 -- has to be displaced, which is what makes a category actionable.
 --
 -- Grouped on expense_category rather than spending_category: the latter is
 -- effectively single-valued ('Contracts') once non-procurement rows are
 -- removed, so it carries no signal (see 01 block 4).
--- Output: Results/03_05_category_fragmentation.csv
+-- Output: Exports/5_where-to-consolidate.csv
 WITH cat_vendor AS (
     SELECT
         expense_category,
@@ -165,8 +165,7 @@ ORDER BY category_spend DESC
 LIMIT 25;
 
 -- 5b. Same scan across all categories with the basket rule applied, so the
--- included and excluded sets can be compared side by side rather than only the
--- included set being visible.
+-- included and excluded categories can be compared side by side.
 WITH cat_vendor AS (
     SELECT
         expense_category,
@@ -217,7 +216,7 @@ ORDER BY category_spend DESC;
 -- 6. Vendors whose spend was split across multiple raw payee names. Quantifies
 -- what the normalization work in 02 recovered: these suppliers appeared smaller
 -- than they are, and several move materially up the ranking once merged.
--- Output: Results/03_06_hidden_concentration.csv
+-- Output: Exports/6_hidden-concentration-from-name-cleaning.csv
 SELECT
     vendor_norm,
     COUNT(DISTINCT payee_name)                                          AS alias_count,
@@ -231,7 +230,7 @@ LIMIT 25;
 
 
 -- 7. Top vendors by spend, post-normalization.
--- Output: Results/03_07_top_vendors.csv
+-- Output: Exports/7_top-20-vendors.csv
 SELECT
     vendor_norm,
     ROUND(SUM(check_amount), 2)   AS total_spend,
@@ -254,13 +253,12 @@ LIMIT 20;
 -- This block recomputes on tail spend within categories that meet a stated
 -- rule: buyer-chosen goods and general services, no mandated or court-driven
 -- payments. Every category matching the rule is included, including small ones,
--- so the basket is defined by the rule rather than selected to reach a number.
--- Output: Results/03_08_realistic_kpi.csv
+-- so the list comes from the rule and wasn't picked to reach a number.
+-- Output: Exports/8b_realistic-kpi.csv
 
 -- 8a. Category strings verified before use. IN is exact-match, and an earlier
 -- pass silently dropped the State of New York Medicaid rows on a near-miss
--- string, so the names below are confirmed against the data rather than
--- assumed.
+-- string, so the names below are checked against the data.
 SELECT expense_category, COUNT(*) AS payments,
        ROUND(SUM(check_amount), 2) AS dollars
 FROM payments_normalized
@@ -324,8 +322,7 @@ target_tail AS (
         -- Considered and excluded, conservatively:
         --   PROF SERV LEGAL SERVICES     court-driven and specialized
         --   TELEPHONE & OTHER COMMUNICATNS  utility-like, few suppliers
-        --   PROF SERV CURRIC & PROF DEVEL   borderline; excluded rather than
-        --                                   argued for
+        --   PROF SERV CURRIC & PROF DEVEL   borderline, so left out
         --   OTHR SERV AND CHRGS-GENERAL     unclassifiable residual category
     )
 )
