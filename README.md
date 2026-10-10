@@ -1,124 +1,118 @@
 # NYC Vendor Rationalization: Tail-Spend Consolidation Analysis
 
-**New York City could realistically save ~$149M per year by consolidating tail-vendor spend** in consolidatable goods and general-services categories — $75M–$224M across a 5–15% benchmark range. The theoretical ceiling is ~$620M if every tail dollar were consolidatable, which it is not.
+New York City could realistically save about **$149M a year** by consolidating its small suppliers in the categories where consolidation actually works. Depending on the savings rate, the range is $75M–$224M. If every dollar of tail spend could be consolidated, the ceiling would be about $620M, but most of it can't, so I report both numbers and use the smaller one as the headline.
 
-Just **797 vendors (4.3%) hold 80%** of the city's $31.0B addressable procurement spend. The other **17,626 vendors (95.7%) share the remaining $6.2B**. That tail also contains rents, legal settlements and human-services contracts that no volume agreement can touch, so the headline number counts only tail spend inside a rule-defined basket of 23 categories ($1.49B addressable). Both frames are reported. The 4x haircut against the ceiling is deliberate.
+797 vendors (4.3%) account for 80% of the city's $31.0B in addressable spend, and the other 17,626 vendors share the remaining $6.2B. That long tail includes rents, legal settlements and human-services contracts that no volume deal can touch. So the headline only counts tail spend in 23 categories that can realistically be consolidated, which comes to $1.49B.
 
 ![NYC Vendor Rationalization dashboard](images/dashboard.png)
 
 **[Interactive dashboard on Tableau Public](https://public.tableau.com/views/NYCVendorRationalization/Dashboard1)**
 
-## The business question
+## The question
 
-A few large vendors carry most of a city's procurement dollars. Thousands of small suppliers share the rest. That long tail is expensive: every additional vendor means another contract to administer, more invoices to process, and no volume leverage.
+A few large vendors get most of a city's procurement dollars, and thousands of small ones split the rest. Every extra vendor means another contract to manage, more invoices to process, and no volume discount. In procurement this is called vendor rationalization, or tail-spend management.
 
-> **If NYC consolidated its long tail of small suppliers, how much could it save per year?**
-
-This is a standard procurement exercise — vendor rationalization, or tail-spend management (see [VOCABULARY.md](VOCABULARY.md)).
+> If NYC consolidated its long tail of small suppliers, how much could it save per year?
 
 ## Data and scope
 
-**Source:** NYC Checkbook (checkbooknyc.com) citywide spending export, FY2025 (2024-07-01 to 2025-06-30), retrieved 2026-06-09. Four CSV parts, ~415 MB.
+**Source:** NYC Checkbook (checkbooknyc.com) citywide spending export for FY2025 (July 1, 2024 to June 30, 2025), downloaded on 2026-06-09. It came as four CSV files, about 415 MB in total.
 
-**Stack:** MySQL (local) + DBeaver, Tableau for the dashboard.
+**Tools:** MySQL with DBeaver for the analysis, Tableau for the dashboard.
 
-Gross spend is $49.40B. The analysis runs on $31.00B. Everything removed in between is documented, and the reasoning for each exclusion is in the cleaning decisions log:
+Gross spend is $49.40B and the analysis uses $31.00B. Every removal is listed in the cleaning decisions log below.
 
 | Stage | Rows | Spend | Removed |
 |---|---|---|---|
-| Raw extract | 1,560,597 | $49.40B | — |
-| After scoping (pensions, negatives, placeholder caps) | 1,554,107 | $39.43B | 6,490 rows / $9.97B |
-| After intergovernmental payee exclusions | 1,552,117 | $31.00B | 1,990 rows / $8.43B |
-| **Analysis base** (`payments_normalized`) | **1,552,117** | **$31.00B** | 18,423 distinct vendors |
+| Raw extract | 1,560,597 | $49.40B | – |
+| After scoping (pensions, negatives, placeholder values) | 1,554,107 | $39.43B | 6,490 rows / $9.97B |
+| After removing payments to other governments | 1,552,117 | $31.00B | 1,990 rows / $8.43B |
+| **Analysis table** (`payments_normalized`) | **1,552,117** | **$31.00B** | 18,423 distinct vendors |
 
-Two exclusions carry most of the difference and both are genuinely outside the question: $5.0B of placeholder values emitted by the pension system, and $8.43B of transfers to other governments and public authorities. The city cannot put its Medicaid obligation out to bid.
+Most of the gap comes from two things that aren't procurement: $5.0B of placeholder values from the pension system, and $8.43B paid to other governments and public authorities. The city's Medicaid payments to New York State, for example, can't be put out to bid.
 
 ## Reproducing this analysis
 
-1. Download the FY2025 citywide spending export from [checkbooknyc.com](https://www.checkbooknyc.com). The export tool splits large results into multiple CSV parts; place them in `Data/Raw/`. Raw data is not committed — it exceeds GitHub's file size limit.
-2. The four `LOAD DATA LOCAL INFILE` statements in `00_load.sql` use paths relative to the repo root (`Data/Raw/…`); run the script from the repo root or substitute absolute paths.
-3. Run the scripts in order against a local MySQL 8 instance. `LOAD DATA LOCAL INFILE` requires `local_infile` enabled server-side and a client reconnect afterward.
-4. Each script ends with a reconciliation query. If a row count does not match the value stated in the comment, stop and re-run the load rather than continuing — a silently skipped malformed row will propagate into every figure downstream.
+1. Download the FY2025 citywide spending export from [checkbooknyc.com](https://www.checkbooknyc.com). The export tool splits large results into several CSV files; put them in `Data/Raw/`. The raw data isn't committed because it's over GitHub's file size limit.
+2. The four `LOAD DATA LOCAL INFILE` statements in `00_load.sql` use paths relative to the repo root (`Data/Raw/…`), so run the script from the repo root or change them to absolute paths.
+3. Run the scripts in order against a local MySQL 8 instance. `LOAD DATA LOCAL INFILE` needs `local_infile` turned on in the server, and you have to reconnect the client afterwards.
+4. Each script ends with a reconciliation query. If a row count doesn't match the number in the comment, re-run the load before going further. A malformed row that gets skipped silently would throw off every number after it.
 
-| File | Purpose |
+| File | What it does |
 |---|---|
-| `00_load.sql` | Create the database and `payments_raw`, load the four CSV parts. Verified: MySQL totals match a direct sum of the source files to the penny |
-| `01_profile.sql` | Profiling — row counts, date range, nulls, spend distribution, agency and payee concentration, duplicate-name scan |
-| `02_normalize.sql` | Scope out non-procurement rows → `payments_scoped`; normalize payee names; entity-level exclusions → `payments_normalized` |
-| `03_analysis.sql` | Pareto split, tail-spend KPI, category fragmentation, top vendors |
+| `00_load.sql` | Creates the database and `payments_raw` and loads the four CSV files. The MySQL totals match a direct sum of the source files to the penny |
+| `01_profile.sql` | Profiling: row counts, date range, nulls, spend distribution, agency and payee concentration, duplicate names |
+| `02_normalize.sql` | Removes non-procurement rows (`payments_scoped`), cleans payee names, removes government payees (`payments_normalized`) |
+| `03_analysis.sql` | Pareto split, tail-spend savings, category fragmentation, top vendors |
 
-Block results are exported to `Exports/` as CSVs, which are what the Tableau workbook reads.
+The query results are exported to `Exports/` as CSVs, and those are what the Tableau workbook reads.
 
-## Findings
+## What I found
 
-**Profiling (01)**
-- Exactly one fiscal year (FY2025), so the KPI is annual with no annualization needed.
-- Zero null payment amounts. Clean load.
-- 18,502 distinct raw payee names.
-- Payment amounts run from **-$13.3M** (reversals/refunds) to exactly **$99,999,999.00**, a system cap used as a placeholder (50 rows, all pension funding, $5.0B total). Repeated round amounts (ten identical $43,000,000 checks) show large obligations paid in installments. This is why the unit of analysis is vendor-level sums, not individual checks.
+**Profiling**
+- The data covers exactly one fiscal year, so the savings figure is already annual.
+- There are no null payment amounts.
+- There are 18,502 distinct payee names.
+- Amounts range from -$13.3M (refunds and reversals) up to exactly $99,999,999.00. That top value is a system cap used as a placeholder: 50 rows, all pension funding, $5.0B in total. I also found repeated round amounts, like ten identical $43,000,000 checks, which are large obligations paid in installments. That's why I added up spend per vendor instead of looking at individual checks.
 
-**Scoping (02, stage 1)**
-- Removed 6,490 rows (0.4% of rows) carrying **$9.97B (20% of dollars)**: pension contributions, negative amounts, and the $99,999,999 placeholders. A handful of rows carried a fifth of the money.
-- **Biggest surprise:** the top remaining "vendors" were not vendors. **State of New York ($6.2B**, mostly Medicaid transfers), NYC Housing Authority, NY Power Authority, MTA Bus. These are intergovernmental transfers, not addressable procurement.
-- Scoping rule: **exclude entities that are themselves governments or public authorities; keep nonprofits and companies holding competed contracts.** Borderline pass-throughs (charter schools, library subsidies) stay in. All of them are strategic-tier size, and the savings KPI touches only tail spend.
+**Scoping**
+- Removing pension contributions, negative amounts and the placeholders took out 6,490 rows (0.4% of rows) but $9.97B (20% of the dollars).
+- The biggest surprise was that the top remaining "vendors" weren't vendors at all: State of New York ($6.2B, mostly Medicaid), NYC Housing Authority, NY Power Authority and MTA Bus. These are payments between governments, not purchases.
+- My rule was to exclude payees that are themselves governments or public authorities, and keep nonprofits and companies that hold competed contracts. I kept borderline cases like charter schools and library subsidies. They all ended up among the largest vendors anyway, so they don't affect the tail-spend number.
 
-**Name normalization (02, stage 2)**
-- Rule chain: uppercase → strip punctuation → collapse whitespace → drop leading "THE" → drop one trailing legal suffix (INC, LLC, CORP, …).
-- Result: **18,502 → 18,428 distinct vendors, 74 aliases collapsed.** The aliases carried real money: School Specialty $26.9M, Wilson Language $14.7M, Imagine Learning $11.9M, each split across two spellings.
-- **Precision over count.** An earlier suffix list also stripped identity-bearing words (FOUNDATION, GROUP, SERVICES, ASSOC) and falsely merged legally distinct entities — a Chamber of Commerce with its charitable Foundation, an LLC with an unrelated nonprofit. Removing those words cut the merge count from 77 to 74 and made every remaining merge defensible one by one.
-- No fuzzy or edit-distance matching. On a spend file a false merge silently overstates one vendor and understates another, and neither error is visible downstream. NYC's vendor master proved clean enough that rule-based normalization was sufficient.
+**Cleaning vendor names**
+- The steps: uppercase, remove punctuation, collapse extra spaces, drop a leading "THE", and drop one trailing legal suffix (INC, LLC, CORP and so on).
+- That merged 74 duplicate names (18,502 → 18,428 vendors), and some of them carried real money. School Specialty ($26.9M), Wilson Language ($14.7M) and Imagine Learning ($11.9M) were each split across two spellings.
+- My first suffix list also removed words like FOUNDATION, GROUP, SERVICES and ASSOC. That wrongly merged separate organizations, for example a Chamber of Commerce with its charitable foundation. Taking those words out of the list dropped the merges from 77 to 74, and I could check each remaining one by hand.
+- I didn't use fuzzy matching. In spend data, a wrong merge makes one vendor look bigger and another look smaller, and nothing later in the analysis would catch it. NYC's vendor names were clean enough that simple rules were enough.
 
 ## Cleaning decisions log
 
 | Exclusion | Why | Impact |
 |---|---|---|
-| Pension Contributions agency | Intergovernmental transfer, not procurement | part of $9.97B below |
-| `check_amount <= 0` | Refunds and reversals, not outbound spend; $0 rows distort counts | -$82M negatives |
+| Pension Contributions agency | A transfer between governments, not procurement | part of the $9.97B below |
+| `check_amount <= 0` | Refunds and reversals, not money going out; $0 rows distort counts | -$82M in negatives |
 | `check_amount = 99,999,999` | System-cap placeholder values, all pension funding | 50 rows, $5.0B |
-| **Subtotal (stage 1)** | | **6,490 rows / $9.97B removed; $39.43B remains** |
-| Government and authority payees (State of NY, NYCHA, NYPA, MTA Bus, Office of Labor Relations) | Intergovernmental transfers that survived the agency filter; not addressable | 1,990 rows / **$8.43B** (21% of remaining dollars in 0.13% of rows) |
+| **Subtotal (stage 1)** | | **6,490 rows / $9.97B removed; $39.43B left** |
+| Government and authority payees (State of NY, NYCHA, NYPA, MTA Bus, Office of Labor Relations) | Payments to other governments that got past the agency filter; procurement can't act on them | 1,990 rows / **$8.43B** (21% of the remaining dollars in 0.13% of rows) |
 | **Final analysis table (`payments_normalized`)** | | **1,552,117 rows / 18,423 vendors / $31.00B** |
 
-## Analysis results (03)
+## Results
 
-**Pareto and KPI (blocks 2–4)**
-- 797 of 18,423 vendors (4.33%) cover exactly 80% of spend ($24.80B). The remaining 17,626 (95.67%) share $6.20B.
-- **Ceiling KPI (block 4)**, all tail spend treated as addressable: $6,199,890,536 → savings at 5/10/15% = $310.0M / $620.0M / $930.0M.
-- **Realistic KPI (block 8)**, tail spend within a rule-defined basket of **23 consolidatable goods and general-services categories**: **$1,491,973,800 addressable → $74.6M / $149.2M (headline) / $223.8M.** The basket came from a full scan of every expense category. Every category matching the rule is included, tiny ones too, so the basket is rule-defined rather than tuned to reach a number. Borderline categories were conservatively excluded with reasons recorded in the SQL: legal services (court-driven and specialized), telecom (utility-like, few suppliers), curriculum and professional development (genuinely ambiguous), and "Othr Serv and Chrgs - General" ($516M, an unclassifiable residual flagged as a data limitation).
-- The 4x gap against the ceiling reflects that most tail dollars — rents, settlements, one-off payments, human-services contracts — are not consolidatable at all.
-- Borderline pass-through entities kept at scoping (charter schools, libraries, UFT Welfare Fund) all landed in the strategic tier as predicted. None touch the tail the KPI is computed on.
+**Pareto split and savings**
+- 797 of 18,423 vendors (4.33%) cover 80% of spend ($24.80B). The other 17,626 (95.67%) share $6.20B.
+- **Ceiling:** if all tail spend could be consolidated, that's $6,199,890,536, or savings of $310.0M / $620.0M / $930.0M at a 5% / 10% / 15% savings rate.
+- **Realistic:** counting only tail spend in 23 goods and general-services categories gives $1,491,973,800, or **$74.6M / $149.2M / $223.8M**. I picked the categories by checking every expense category against one rule and including every match, even the tiny ones, so the list wasn't chosen to hit a number. I left out borderline categories and noted why in the SQL: legal services (court-driven and specialized), telecom (few suppliers, works like a utility), curriculum and professional development (could go either way), and "Othr Serv and Chrgs - General" ($516M of spending with no useful label).
+- The realistic figure is about a quarter of the ceiling because most tail dollars (rent, settlements, one-off payments, human-services contracts) can't be consolidated.
+- The borderline payees I kept during scoping (charter schools, libraries, the UFT Welfare Fund) all landed among the largest vendors, as expected, so none of them affect the tail.
 
-**Where to consolidate (block 5, by `expense_category`)** — high vendor count, no dominant supplier, buyer-chosen goods and services:
-1. **Contractual Services – General**: $1.30B / 1,985 vendors / largest supplier holds only 6.0%
-2. **Supplies + Materials – General**: $1.04B / 3,853 vendors / largest supplier 11.8%. The textbook tail-spend category.
-3. **Prof Serv – Other**: $730M / 1,326 vendors (caveat: largest supplier already at 26.7%)
-4. **Equipment – General**: same pattern, further down the spend ranking
+**Where to consolidate**
 
-Ruled out despite fragmentation: Charter Schools ($3.4B, mandated per-pupil pass-throughs), Payments to Delegate Agencies, and homeless-services categories (social-service provider networks, not bundleable purchases). Maintenance & Operation of Infrastructure is already concentrated at 57%.
+These categories have many vendors, no dominant supplier, and goods or services the city chooses to buy:
 
-**Fragmented purchasing in action (blocks 6–7)**
-- CDW Government: 48,208 separate payments from 48 different agencies, $399M. SHI International: 60 agencies. Dozens of agencies independently buying IT from the same suppliers.
-- Name-cleanup payoff: School Specialty looked like two mid-size vendors. It is one $26.9M relationship, among 74 alias merges totaling $100M+.
-- `spending_category` turned out to be single-valued ("Contracts") in the scoped data, so fragmentation analysis uses `expense_category` instead.
+1. **Contractual Services – General:** $1.30B across 1,985 vendors; the largest supplier has only 6.0%
+2. **Supplies + Materials – General:** $1.04B across 3,853 vendors; the largest supplier has 11.8%
+3. **Prof Serv – Other:** $730M across 1,326 vendors, although the largest supplier already has 26.7%
+4. **Equipment – General:** the same pattern on a smaller scale
+
+Some fragmented categories don't make sense to consolidate: Charter Schools ($3.4B of required per-pupil payments), Payments to Delegate Agencies, and homeless-services categories, which are networks of social-service providers rather than purchases you can bundle. Maintenance & Operation of Infrastructure is already 57% with one supplier.
+
+**Examples of fragmented buying**
+- CDW Government received 48,208 separate payments from 48 different agencies, $399M in total, and SHI International was paid by 60 agencies. Dozens of agencies are buying IT from the same suppliers separately.
+- Cleaning the names turned School Specialty from two mid-size vendors into one $26.9M relationship. The 74 merges together covered more than $100M.
+- `spending_category` had only one value ("Contracts") after scoping, so I used `expense_category` for the category analysis.
 
 ## Dashboard
 
-Built in Tableau against the CSVs in `Exports/`. Layout in reading order: KPI tiles ($149M realistic, $620M ceiling) → Pareto curve with the flip marked at 797 vendors / 4.3% → Strategic-vs-Tail bars (4.33% of vendors against 80% of spend) → category chart, "Where the money is and what's consolidatable," colored by basket decision.
+I built the dashboard in Tableau from the CSVs in `Exports/`. From top to bottom: the two savings figures ($149M realistic, $620M ceiling), the Pareto curve with the 797-vendor cutoff marked, bars comparing the share of vendors and spend in each tier, and a category chart colored by whether each category was included.
 
-Chart rules:
-- The category chart shows **all 23 target categories plus every excluded category ≥ $1B**. Excluded giants stay visible so the chart shows what the analysis chose not to count — Charter Schools sits at the top of the chart, in grey.
-- The four smallest target categories round to **$0M at label precision**. The basket is rule-defined, so tiny matching categories are included rather than trimmed for appearance.
-- The category chart scrolls rather than squeezing every bar above the fold. Everything decision-relevant sits at the top.
+The category chart shows all 23 included categories plus every excluded category over $1B, so you can see what I left out. Charter Schools is at the top, in grey. The four smallest included categories show as $0M at the chart's rounding. The chart scrolls so the important bars stay at the top. A one-page PDF of the dashboard is in `Data Viz/`.
 
 ## Limitations
 
-1. **Single fiscal year.** FY2025 only. No trend or repeat-purchase view. A vendor that looks like tail this year may be mid-ramp.
-2. **The savings rate is a benchmark, not a result.** 5/10/15% is an industry sensitivity range applied to the addressable pot. The data determines the pot ($1.49B realistic, $6.20B ceiling); the rate is an assumption stated up front. Any other rate can be substituted and the KPI scales linearly.
-3. **"Othr Serv and Chrgs - General" ($516M) is an unclassifiable residual.** Some of it is likely consolidatable, but the category label cannot say which part. Excluded from the basket and flagged rather than guessed at.
-4. **An N/A expense category exists in the raw data.** Small dollars, below the category chart's display threshold. Kept in totals, unclassifiable for basket purposes.
-5. **No fuzzy name matching.** Normalization is rule-based (case, punctuation, legal suffixes). Abbreviations and typos — "NY" against "New York" — are out of scope.
-6. **The 80% Pareto cutoff is a convention.** The Strategic/Tail boundary at rank 797 is a stated choice, not a property of the data. Nearby cutoffs shift the split but not the conclusion.
-
----
-
-*Companion doc: [VOCABULARY.md](VOCABULARY.md) — the procurement domain glossary behind the terms used here. A print-tuned one-page PDF of the dashboard is in `Data Viz/`.*
+1. **One fiscal year only,** so there's no trend view. A vendor in the tail this year might be growing.
+2. **The savings rate is an assumption.** 5% / 10% / 15% is a common industry range applied to the addressable spend. The data gives the spend ($1.49B realistic, $6.20B ceiling) and the rate is an assumption, so the result scales directly with whatever rate you pick.
+3. **"Othr Serv and Chrgs - General" ($516M) has no useful label.** Some of it could probably be consolidated, but I can't tell which part, so I left it out.
+4. **Some rows have an N/A expense category.** The dollars are small. They're included in the totals but can't be assigned to a category.
+5. **No fuzzy matching,** so abbreviations and typos ("NY" vs "New York") aren't merged.
+6. **The 80% cutoff is a convention.** Moving it would shift the split a little but wouldn't change the conclusion.
