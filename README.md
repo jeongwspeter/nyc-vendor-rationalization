@@ -1,6 +1,6 @@
 # NYC Vendor Rationalization: Tail-Spend Consolidation Analysis
 
-New York City could realistically save about **$149M a year** by consolidating its small suppliers in the categories where consolidation actually works. Depending on the savings rate, the range is $75M-$224M. If every dollar of tail spend could be consolidated, the ceiling would be about $620M, but most of it can't, so I report both numbers and use the smaller one as the headline.
+New York City could save about $149M a year by consolidating its small suppliers in the categories where that's practical ($75M-$224M depending on the savings rate). If every dollar of tail spend could be consolidated, the ceiling would be about $620M. Most of it can't, so I report both and lead with the smaller number.
 
 797 vendors (4.3%) account for 80% of the city's $31.0B in addressable spend, and the other 17,626 vendors share the remaining $6.2B. That long tail includes rents, legal settlements and human-services contracts that no volume deal can touch. So the headline only counts tail spend in 23 categories that can realistically be consolidated, which comes to $1.49B.
 
@@ -58,7 +58,7 @@ The query results are exported to `Exports/` as CSVs, and those are what the Tab
 **Scoping**
 - Removing pension contributions, negative amounts and the placeholders took out 6,490 rows (0.4% of rows) but $9.97B (20% of the dollars).
 - The biggest surprise was that the top remaining "vendors" weren't vendors at all: State of New York ($6.2B, mostly Medicaid), NYC Housing Authority, NY Power Authority and MTA Bus. These are payments between governments, not purchases.
-- My rule was to exclude payees that are themselves governments or public authorities, and keep nonprofits and companies that hold competed contracts. I kept borderline cases like charter schools and library subsidies. They all ended up among the largest vendors anyway, so they don't affect the tail-spend number.
+- My rule was to exclude payees that are themselves governments or public authorities, and keep nonprofits and companies that hold competed contracts. I kept borderline cases like charter schools, library subsidies and the UFT Welfare Fund. They all ended up among the largest vendors anyway, so they don't affect the tail-spend number.
 
 **Cleaning vendor names**
 - The steps: uppercase, remove punctuation, collapse extra spaces, drop a leading "THE", and drop one trailing legal suffix (INC, LLC, CORP and so on).
@@ -84,7 +84,6 @@ The query results are exported to `Exports/` as CSVs, and those are what the Tab
 - **Ceiling:** if all tail spend could be consolidated, that's $6,199,890,536, or savings of $310.0M / $620.0M / $930.0M at a 5% / 10% / 15% savings rate.
 - **Realistic:** counting only tail spend in 23 goods and general-services categories gives $1,491,973,800, or **$74.6M / $149.2M / $223.8M**. I picked the categories by checking every expense category against one rule and including every match, even the tiny ones, so the list wasn't chosen to hit a number. I left out borderline categories and noted why in the SQL: legal services (court-driven and specialized), telecom (few suppliers, works like a utility), curriculum and professional development (could go either way), and "Othr Serv and Chrgs - General" ($516M of spending with no useful label).
 - The realistic figure is about a quarter of the ceiling because most tail dollars (rent, settlements, one-off payments, human-services contracts) can't be consolidated.
-- The borderline payees I kept during scoping (charter schools, libraries, the UFT Welfare Fund) all landed among the largest vendors, as expected, so none of them affect the tail.
 
 **Where to consolidate**
 
@@ -111,7 +110,7 @@ The category chart shows all 23 included categories plus every excluded category
 ## Limitations
 
 1. **One fiscal year only,** so there's no trend view. A vendor in the tail this year might be growing.
-2. **The savings rate is an assumption.** 5% / 10% / 15% is a common industry range applied to the addressable spend. The data gives the spend ($1.49B realistic, $6.20B ceiling) and the rate is an assumption, so the result scales directly with whatever rate you pick.
+2. **The savings rate is an assumption.** I used 5% / 10% / 15%, a common industry range. The spend ($1.49B realistic, $6.20B ceiling) comes from the data, and the savings scale directly with whatever rate you pick.
 3. **"Othr Serv and Chrgs - General" ($516M) has no useful label.** Some of it could probably be consolidated, but I can't tell which part, so I left it out.
 4. **Some rows have an N/A expense category.** The dollars are small. They're included in the totals but can't be assigned to a category.
 5. **No fuzzy matching,** so abbreviations and typos ("NY" vs "New York") aren't merged.
